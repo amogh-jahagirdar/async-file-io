@@ -19,8 +19,10 @@
 
 package io.tabular;
 
+import com.google.common.base.Joiner;
 import com.google.common.collect.Maps;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.io.IOUtils;
 import org.apache.iceberg.Files;
 import org.apache.iceberg.inmemory.InMemoryFileIO;
 import org.apache.iceberg.io.FileIO;
@@ -38,13 +40,11 @@ import org.apache.iceberg.util.ThreadPools;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.Closeable;
-import java.io.File;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
+import java.io.*;
+import java.util.Arrays;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
@@ -371,6 +371,8 @@ public class AsyncFileIO extends ResolvingFileIO {
         } catch (InterruptedException e) {
           Thread.currentThread().interrupt();
           this.delegate = source;
+        } catch (CancellationException e) {
+          this.delegate = source;
         }
       }
 
@@ -383,6 +385,7 @@ public class AsyncFileIO extends ResolvingFileIO {
       if (future.isDone()) {
         return delegate().getLength();
       } else {
+        future.cancel(true);
         return source.getLength();
       }
     }
@@ -392,6 +395,7 @@ public class AsyncFileIO extends ResolvingFileIO {
       if (future.isDone()) {
         return delegate().newStream();
       } else {
+        future.cancel(true);
         LOG.info("Using remote copy of {}", source.location());
         return source.newStream();
       }
